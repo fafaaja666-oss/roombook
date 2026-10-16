@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1200" viewBox="0 0 1000 1200" role="img" aria-label="Ilustrasi ruang rapat modern" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#16233f"/>
+      <stop offset="60%" stop-color="#14213d"/>
+      <stop offset="100%" stop-color="#0d1730"/>
+    </linearGradient>
+    <linearGradient id="windowLight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#dbeafe"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+    <linearGradient id="tableTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#eef3fc"/>
+      <stop offset="100%" stop-color="#c3cfe6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="vignette" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d1730" stop-opacity="0.05"/>
+      <stop offset="70%" stop-color="#0d1730" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#0d1730" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1000" height="1200" fill="url(#bg)"/>
+
+  <ellipse cx="500" cy="360" rx="520" ry="360" fill="url(#glow)"/>
+
+  <rect x="0" y="0" width="1000" height="830" fill="#16233f"/>
+  <rect x="0" y="830" width="1000" height="370" fill="#101a30"/>
+
+  <g opacity="0.5" fill="#93c5fd">
+    <rect x="170" y="70" width="260" height="14" rx="7"/>
+    <rect x="570" y="70" width="260" height="14" rx="7"/>
+  </g>
+
+  <g>
+    <rect x="110" y="130" width="330" height="430" rx="18" fill="url(#windowLight)"/>
+    <rect x="110" y="130" width="330" height="430" rx="18" fill="none" stroke="#24365f" stroke-width="14"/>
+    <line x1="275" y1="130" x2="275" y2="560" stroke="#24365f" stroke-width="12"/>
+    <line x1="110" y1="345" x2="440" y2="345" stroke="#24365f" stroke-width="12"/>
+  </g>
+  <g>
+    <rect x="560" y="130" width="330" height="430" rx="18" fill="url(#windowLight)"/>
+    <rect x="560" y="130" width="330" height="430" rx="18" fill="none" stroke="#24365f" stroke-width="14"/>
+    <line x1="725" y1="130" x2="725" y2="560" stroke="#24365f" stroke-width="12"/>
+    <line x1="560" y1="345" x2="890" y2="345" stroke="#24365f" stroke-width="12"/>
+  </g>
+
+  <g>
+    <rect x="360" y="640" width="280" height="170" rx="14" fill="#0b1424" stroke="#2b3f6b" stroke-width="8"/>
+    <polyline points="390,760 450,720 510,745 570,685 620,700" fill="none" stroke="#60a5fa" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="570" cy="685" r="9" fill="#93c5fd"/>
+  </g>
+
+  <g>
+    <rect x="195" y="885" width="610" height="150" rx="75" fill="#0d1730" opacity="0.6"/>
+    <rect x="185" y="860" width="630" height="150" rx="75" fill="url(#tableTop)"/>
+    <rect x="185" y="860" width="630" height="46" rx="23" fill="#ffffff" opacity="0.35"/>
+  </g>
+
+  <g fill="#2b3f6b">
+    <rect x="215" y="780" width="96" height="70" rx="20"/>
+    <rect x="452" y="780" width="96" height="70" rx="20"/>
+    <rect x="689" y="780" width="96" height="70" rx="20"/>
+  </g>
+  <g fill="#1e2b48">
+    <rect x="215" y="980" width="96" height="70" rx="20"/>
+    <rect x="452" y="980" width="96" height="70" rx="20"/>
+    <rect x="689" y="980" width="96" height="70" rx="20"/>
+  </g>
+
+  <g transform="translate(760 940)">
+    <path d="M40 0 C60 40 60 90 40 130 C20 90 20 40 40 0 Z" fill="#16a34a"/>
+    <path d="M0 30 C30 40 46 78 40 120 C4 112 -14 74 0 30 Z" fill="#22c55e"/>
+    <path d="M80 30 C50 40 34 78 40 120 C76 112 94 74 80 30 Z" fill="#15803d"/>
+    <path d="M22 120 L58 120 L52 180 L28 180 Z" fill="#c2410c"/>
+  </g>
+
+  <rect width="1000" height="1200" fill="url(#vignette)"/>
+</svg>
