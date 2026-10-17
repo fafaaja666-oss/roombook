@@ -2,16 +2,23 @@ import type { ButtonHTMLAttributes } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'subtle' | 'danger';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'subtle'
+  | 'gold'
+  | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary:
     'bg-primary text-white shadow-sm shadow-primary/20 hover:bg-primary-dark active:bg-primary-dark',
-  secondary: 'bg-white text-ink border border-line shadow-sm hover:bg-slate-50',
-  ghost: 'text-muted hover:bg-slate-100 hover:text-ink',
-  subtle: 'bg-primary-soft text-primary hover:bg-blue-100',
-  danger: 'bg-danger text-white shadow-sm hover:bg-red-700',
+  secondary: 'bg-white text-ink border border-line shadow-sm hover:bg-cream/60',
+  ghost: 'text-muted hover:bg-cream hover:text-ink',
+  subtle: 'bg-primary-soft text-primary hover:bg-cream',
+  gold: 'bg-gold text-white shadow-sm shadow-gold/25 hover:bg-gold-dark',
+  danger: 'bg-danger text-white shadow-sm hover:bg-red-800',
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -32,7 +39,7 @@ export function buttonClasses({
 } = {}): string {
   return cn(
     'inline-flex items-center justify-center rounded-lg font-medium transition-colors duration-150',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
     'disabled:pointer-events-none disabled:opacity-50',
     VARIANTS[variant],
     SIZES[size],

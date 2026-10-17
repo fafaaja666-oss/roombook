@@ -2,182 +2,178 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
+import { CalendarX2, LogIn, Search } from 'lucide-react';
 import { useData } from '@/hooks/useData';
+import { useAuth } from '@/hooks/useAuth';
 import { useToday } from '@/hooks/useToday';
 import { useToast } from '@/components/ui/Toast';
-import ReservationCard from '@/components/reservations/ReservationCard';
+import { canCancel } from '@/lib/domain';
+import { cancelReservation } from '@/lib/repository';
 import EmptyState from '@/components/ui/EmptyState';
+import Button from '@/components/ui/Button';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import StatCard from '@/components/ui/StatCard';
-import { Card } from '@/components/ui/Card';
-import { buttonClasses } from '@/components/ui/Button';
-import type { Reservation, ReservationStatus } from '@/types';
-import { isPastDate } from '@/utils/helpers';
-import { FileText, Plus, Search, Clock, CheckCircle2, XCircle } from 'lucide-react';
-import { cn } from '@/lib/cn';
+import { Input } from '@/components/ui/Field';
+import { Skeleton } from '@/components/ui/Skeleton';
+import ReservationCard from '@/components/reservations/ReservationCard';
+import type { Reservation } from '@/types';
 
-type Filter = 'all' | ReservationStatus;
-
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'all', label: 'Semua' },
-  { value: 'Menunggu Persetujuan', label: 'Menunggu' },
-  { value: 'Disetujui', label: 'Disetujui' },
-  { value: 'Ditolak', label: 'Ditolak' },
-  { value: 'Dibatalkan', label: 'Dibatalkan' },
-];
+function normalize(value: string): string {
+  return value.replace(/[^\d]/g, '').toLowerCase();
+}
 
 export default function MyReservations() {
-  const { user } = useAuth();
-  const { reservations, updateReservations } = useData();
+  const { reservations, rooms, loading } = useData();
+  const { user, isStaff: isStaffRole } = useAuth();
   const today = useToday();
   const { toast } = useToast();
-  const [filter, setFilter] = useState<Filter>('all');
-  const [query, setQuery] = useState('');
-  const [cancelTarget, setCancelTarget] = useState<Reservation | null>(null);
 
-  const mine = useMemo(
-    () => reservations.filter((r) => r.userId === user?.id),
-    [reservations, user]
-  );
+  const [query, setQuery] = useState('');
+  const [target, setTarget] = useState<Reservation | null>(null);
+  const [working, setWorking] = useState(false);
+
+  const mine = useMemo(() => {
+    if (!user) return [];
+    if (isStaffRole) return reservations;
+    return reservations.filter((reservation) => {
+      const emailMatch =
+        user.email && reservation.guestEmail?.toLowerCase() === user.email.toLowerCase();
+      const phoneMatch =
+        user.phone && normalize(reservation.guestPhone) === normalize(user.phone);
+      return Boolean(emailMatch || phoneMatch);
+    });
+  }, [reservations, user, isStaffRole]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = filter === 'all' ? mine : mine.filter((r) => r.status === filter);
-    return list
-      .filter(
-        (r) =>
-          !q ||
-          r.eventName.toLowerCase().includes(q) ||
-          r.roomName.toLowerCase().includes(q)
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.date).getTime() - new Date(a.date).getTime() ||
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-  }, [mine, filter, query]);
-
-  const countFor = (value: Filter) =>
-    value === 'all' ? mine.length : mine.filter((r) => r.status === value).length;
-
-  const canCancel = (r: Reservation) =>
-    (r.status === 'Menunggu Persetujuan' || r.status === 'Disetujui') &&
-    !isPastDate(r.date, today);
+    const term = query.trim().toLowerCase();
+    const list = term
+      ? mine.filter(
+          (r) =>
+            r.code.toLowerCase().includes(term) ||
+            r.guestName.toLowerCase().includes(term) ||
+            r.roomNumber.toLowerCase().includes(term)
+        )
+      : mine;
+    return [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [mine, query]);
 
   const handleCancel = () => {
-    if (!cancelTarget) return;
-    const now = new Date().toISOString();
-    updateReservations(
-      reservations.map((r) =>
-        r.id === cancelTarget.id ? { ...r, status: 'Dibatalkan', updatedAt: now } : r
-      )
-    );
-    toast({ title: 'Reservasi dibatalkan', description: cancelTarget.eventName, variant: 'info' });
-    setCancelTarget(null);
+    if (!target) return;
+    setWorking(true);
+    const result = cancelReservation(target.id, user, 'Dibatalkan melalui halaman reservasi saya.');
+    setWorking(false);
+    if (!result.ok) {
+      toast({ title: result.error ?? 'Gagal membatalkan.', variant: 'error' });
+      return;
+    }
+    toast({ title: `Reservasi ${target.code} dibatalkan`, variant: 'success' });
+    setTarget(null);
   };
 
+  if (!user) {
+    return (
+      <EmptyState
+        icon={LogIn}
+        title="Masuk untuk melihat reservasi"
+        description="Silakan masuk dengan akun Anda untuk melihat daftar dan status reservasi."
+        action={
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+          >
+            <LogIn className="h-4 w-4" /> Masuk
+          </Link>
+        }
+      />
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Pengajuan" value={countFor('all')} icon={FileText} tone="navy" />
-        <StatCard
-          label="Menunggu"
-          value={countFor('Menunggu Persetujuan')}
-          icon={Clock}
-          tone="warning"
-        />
-        <StatCard
-          label="Disetujui"
-          value={countFor('Disetujui')}
-          icon={CheckCircle2}
-          tone="success"
-        />
-        <StatCard label="Ditolak" value={countFor('Ditolak')} icon={XCircle} tone="danger" />
+    <div>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <Input
+            placeholder={isStaffRole ? 'Cari kode, nama, kamar…' : 'Cari kode atau kamar…'}
+            className="pl-10"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            aria-label="Cari reservasi"
+          />
+        </div>
+        <span className="text-sm text-muted">{filtered.length} reservasi</span>
+        <Link
+          href="/kamar"
+          className="ml-auto inline-flex items-center rounded-lg border border-line bg-white px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:bg-cream"
+        >
+          Pesan kamar baru
+        </Link>
       </div>
 
-      <Card className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-1 rounded-xl bg-canvas p-1">
-          {FILTERS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setFilter(option.value)}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                filter === option.value ? 'bg-white text-ink shadow-sm' : 'text-muted hover:text-ink'
-              )}
-            >
-              {option.label}
-              <span
-                className={cn(
-                  'rounded-full px-1.5 text-xs',
-                  filter === option.value
-                    ? 'bg-primary-soft text-primary'
-                    : 'bg-slate-200/70 text-muted'
-                )}
-              >
-                {countFor(option.value)}
-              </span>
-            </button>
+      {loading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-2xl border border-line bg-surface p-5">
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="mt-3 h-4 w-full" />
+              <Skeleton className="mt-2 h-4 w-2/3" />
+            </div>
           ))}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="relative sm:w-60">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari kegiatan atau ruangan..."
-              className="h-11 w-full rounded-lg border border-line bg-canvas pl-10 pr-3 text-sm text-ink placeholder:text-slate-400 focus:border-primary focus:bg-white focus:outline-none focus:ring-4 focus:ring-primary/10"
-            />
-          </div>
-          <Link href="/booking" className={buttonClasses({ className: 'h-11' })}>
-            <Plus className="h-4 w-4" /> Booking Ruangan
-          </Link>
-        </div>
-      </Card>
-
-      {filtered.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <EmptyState
-          icon={FileText}
+          icon={CalendarX2}
           title="Belum ada reservasi"
-          description="Anda belum memiliki reservasi pada kategori ini."
+          description={
+            query
+              ? 'Tidak ada reservasi yang cocok dengan pencarian Anda.'
+              : 'Reservasi yang Anda buat akan muncul di sini.'
+          }
           action={
-            <Link href="/booking" className={buttonClasses({})}>
-              <Plus className="h-4 w-4" /> Buat Reservasi
+            <Link
+              href="/kamar"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+            >
+              Jelajahi Kamar
             </Link>
           }
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {filtered.map((reservation) => (
-            <ReservationCard
-              key={reservation.id}
-              reservation={reservation}
-              actions={
-                canCancel(reservation) ? (
-                  <button
-                    type="button"
-                    onClick={() => setCancelTarget(reservation)}
-                    className={buttonClasses({ variant: 'secondary', size: 'sm' })}
-                  >
-                    Batalkan
-                  </button>
-                ) : undefined
-              }
-            />
-          ))}
+        <div className="space-y-4">
+          {filtered.map((reservation) => {
+            const room = rooms.find((r) => r.id === reservation.roomId);
+            const gate = canCancel(reservation, room, today);
+            return (
+              <ReservationCard
+                key={reservation.id}
+                reservation={reservation}
+                actions={
+                  gate.ok ? (
+                    <Button variant="secondary" size="sm" onClick={() => setTarget(reservation)}>
+                      Batalkan
+                    </Button>
+                  ) : null
+                }
+                footer={
+                  <span className="mr-auto text-xs text-muted">{gate.reason ?? ''}</span>
+                }
+              />
+            );
+          })}
         </div>
       )}
 
       <ConfirmDialog
-        open={Boolean(cancelTarget)}
-        title="Batalkan Reservasi"
-        message={`Yakin ingin membatalkan reservasi "${cancelTarget?.eventName ?? ''}"? Tindakan ini tidak dapat dibatalkan.`}
+        open={Boolean(target)}
+        title="Batalkan reservasi?"
+        message={
+          target
+            ? `Reservasi ${target.code} untuk ${target.guestName} akan dibatalkan. Tindakan ini tidak dapat diurungkan.`
+            : ''
+        }
         confirmLabel="Ya, batalkan"
+        loading={working}
         onConfirm={handleCancel}
-        onCancel={() => setCancelTarget(null)}
+        onCancel={() => setTarget(null)}
       />
     </div>
   );

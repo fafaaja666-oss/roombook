@@ -47,7 +47,7 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
-        className="animate-fade-in fixed inset-0 bg-navy/50 backdrop-blur-sm"
+        className="animate-fade-in fixed inset-0 bg-charcoal/50 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -56,7 +56,7 @@ export default function Modal({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'animate-scale-in relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl shadow-navy/20 sm:rounded-2xl',
+          'animate-scale-in relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl shadow-charcoal/20 sm:rounded-2xl',
           SIZES[size]
         )}
       >
@@ -69,14 +69,14 @@ export default function Modal({
             type="button"
             onClick={onClose}
             aria-label="Tutup"
-            className="-mr-1 rounded-lg p-1.5 text-muted transition-colors hover:bg-slate-100 hover:text-ink"
+            className="-mr-1 rounded-lg p-1.5 text-muted transition-colors hover:bg-cream hover:text-ink"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
         <div className="overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-3 border-t border-line bg-slate-50/60 px-6 py-4">
+          <div className="flex justify-end gap-3 border-t border-line bg-canvas/60 px-6 py-4">
             {footer}
           </div>
         )}

@@ -1,37 +1,50 @@
 @import "tailwindcss";
 
+/*
+ * RoomBook — Luxury Hospitality Design Tokens
+ * Palet: charcoal, putih gading (ivory), krem hangat, aksen emas terbatas.
+ */
 @theme {
-  --color-navy: #14213d;
-  --color-navy-700: #1b2b4f;
-  --color-navy-600: #24365f;
+  --color-charcoal: #26221d;
+  --color-charcoal-soft: #3a342c;
 
-  --color-primary: #2563eb;
-  --color-primary-dark: #1d4ed8;
-  --color-primary-soft: #eff6ff;
+  --color-primary: #2b2723;
+  --color-primary-dark: #171410;
+  --color-primary-soft: #f3ece1;
 
-  --color-canvas: #f5f7fb;
+  --color-navy: #201c17;
+  --color-navy-700: #2b2723;
+  --color-navy-600: #3a342c;
+
+  --color-gold: #b0873f;
+  --color-gold-dark: #8c6a2c;
+  --color-gold-soft: #f6eeda;
+
+  --color-canvas: #f7f4ee;
+  --color-cream: #f1e9dc;
   --color-surface: #ffffff;
-  --color-ink: #172033;
-  --color-muted: #64748b;
-  --color-line: #e2e8f0;
+  --color-ink: #241f19;
+  --color-muted: #6f665a;
+  --color-line: #e7ded0;
 
-  --color-success: #15803d;
-  --color-success-soft: #dcfce7;
-  --color-warning: #c2410c;
-  --color-warning-soft: #ffedd5;
-  --color-danger: #b91c1c;
-  --color-danger-soft: #fee2e2;
+  --color-success: #3f7a56;
+  --color-success-soft: #e8f1ea;
+  --color-warning: #a9701f;
+  --color-warning-soft: #f7eeda;
+  --color-danger: #a83f38;
+  --color-danger-soft: #f8e9e7;
 }
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
 }
 
 :root {
   color-scheme: light;
-  --background: #f5f7fb;
-  --foreground: #172033;
+  --background: #f7f4ee;
+  --foreground: #241f19;
 }
 
 body {
@@ -50,7 +63,7 @@ body {
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--color-gold);
     outline-offset: 2px;
   }
 
@@ -58,23 +71,23 @@ body {
   select,
   textarea {
     background-color: #ffffff;
-    color: #172033;
+    color: #241f19;
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: #64748b;
+    color: #9a9081;
     opacity: 1;
   }
 
   select option {
     background-color: #ffffff;
-    color: #172033;
+    color: #241f19;
   }
 
   ::selection {
-    background: #dbeafe;
-    color: #14213d;
+    background: #f0e4c8;
+    color: #26221d;
   }
 
   ::-webkit-scrollbar {
@@ -87,14 +100,14 @@ body {
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #d9cebb;
     border: 2px solid transparent;
     border-radius: 9999px;
     background-clip: content-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #c3b69f;
     background-clip: content-box;
   }
 }
@@ -175,5 +188,15 @@ body {
 
   .text-balance {
     text-wrap: balance;
+  }
+
+  .font-display {
+    font-family: var(--font-display), Georgia, "Times New Roman", serif;
+    letter-spacing: -0.01em;
+  }
+
+  .glass {
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
   }
 }

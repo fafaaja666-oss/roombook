@@ -1,368 +1,352 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
+import { CheckCircle2, CalendarCheck2, Receipt, ArrowRight } from 'lucide-react';
 import { useData } from '@/hooks/useData';
+import { useAuth } from '@/hooks/useAuth';
 import { useToday } from '@/hooks/useToday';
-import { TIME_OPTIONS } from '@/constants/data';
+import { useToast } from '@/components/ui/Toast';
+import { calculateNights, calculateTotal, getAvailableRooms, isStaff } from '@/lib/domain';
+import { createReservation, formatCurrency } from '@/lib/repository';
+import { addDays, formatDate } from '@/utils/helpers';
+import { Input, Select, Textarea, Field } from '@/components/ui/Field';
+import Button from '@/components/ui/Button';
 import type { Reservation } from '@/types';
-import {
-  generateReservationId,
-  isPastDate,
-  isTimeRangeValid,
-  findConflictingReservations,
-  formatDate,
-} from '@/utils/helpers';
-import { getFacilityIcon } from '@/lib/facilities';
-import { Card, CardHeader } from '@/components/ui/Card';
-import { Field, Input, Select, Textarea } from '@/components/ui/Field';
-import Button, { buttonClasses } from '@/components/ui/Button';
-import EmptyState from '@/components/ui/EmptyState';
-import {
-  CheckCircle2,
-  CalendarClock,
-  Clock,
-  Users,
-  Info,
-  MapPin,
-  AlertCircle,
-  CalendarOff,
-} from 'lucide-react';
-import Image from 'next/image';
 
-export default function BookingForm() {
-  const { user } = useAuth();
-  const { rooms, reservations, updateReservations } = useData();
+export default function BookingForm({
+  initialRoomId = '',
+  initialCheckIn = '',
+  initialCheckOut = '',
+}: {
+  initialRoomId?: string;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+}) {
+  const { rooms, reservations, loading } = useData();
+  const { user, role } = useAuth();
   const today = useToday();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const { toast } = useToast();
 
-  const availableRooms = useMemo(() => rooms.filter((r) => !r.isMaintenance), [rooms]);
-  const preselected = searchParams.get('room') ?? '';
-  const defaultRoomId =
-    availableRooms.find((r) => r.id === preselected)?.id ?? availableRooms[0]?.id ?? '';
-  const [roomId, setRoomId] = useState(defaultRoomId);
-  const [eventName, setEventName] = useState('');
-  const [date, setDate] = useState(searchParams.get('date') ?? '');
-  const [startTime, setStartTime] = useState(searchParams.get('start') ?? '08:00');
-  const [endTime, setEndTime] = useState(searchParams.get('end') ?? '09:00');
-  const [participants, setParticipants] = useState('');
-  const [purpose, setPurpose] = useState('');
+  const [roomId, setRoomId] = useState(initialRoomId);
+  const [checkIn, setCheckIn] = useState(initialCheckIn || today);
+  const [checkOut, setCheckOut] = useState(initialCheckOut || addDays(today, 1));
+  const [guestName, setGuestName] = useState(user?.role === 'guest' ? user.name : '');
+  const [guestPhone, setGuestPhone] = useState(user?.phone ?? '');
+  const [guestEmail, setGuestEmail] = useState(user?.role === 'guest' ? user.email : '');
+  const [guestIdNumber, setGuestIdNumber] = useState('');
+  const [guests, setGuests] = useState(1);
   const [notes, setNotes] = useState('');
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [created, setCreated] = useState<Reservation | null>(null);
 
-  const activeDate = date || today;
-  const selectedRoom = rooms.find((r) => r.id === roomId) ?? null;
-  const conflicts = useMemo(() => {
-    if (!roomId || !activeDate || !startTime || !endTime || startTime >= endTime) return [];
-    return findConflictingReservations(reservations, roomId, activeDate, startTime, endTime);
-  }, [reservations, roomId, activeDate, startTime, endTime]);
+  const datesValid = Boolean(checkIn && checkOut && checkOut > checkIn);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const availableRooms = useMemo(() => {
+    if (!datesValid) return rooms.filter((room) => room.active && room.status !== 'maintenance');
+    return getAvailableRooms(rooms, reservations, checkIn, checkOut);
+  }, [rooms, reservations, checkIn, checkOut, datesValid]);
 
-    if (!user) return;
-    if (!roomId) {
-      setError('Pilih ruangan terlebih dahulu');
-      return;
-    }
-    if (!eventName.trim()) {
-      setError('Nama kegiatan wajib diisi');
-      return;
-    }
-    if (!activeDate) {
-      setError('Tanggal wajib diisi');
-      return;
-    }
-    if (isPastDate(activeDate, today)) {
-      setError('Tidak dapat memesan tanggal yang sudah lewat');
-      return;
-    }
-    if (!isTimeRangeValid(startTime, endTime)) {
-      setError('Jam selesai harus setelah jam mulai');
+  const selectedRoom = rooms.find((room) => room.id === roomId);
+
+  const nights = datesValid ? calculateNights(checkIn, checkOut) : 0;
+  const estimatedTotal = selectedRoom ? calculateTotal(selectedRoom.pricePerNight, nights) : 0;
+
+  const staffBooking = isStaff(role);
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+
+    if (!selectedRoom) {
+      setError('Silakan pilih kamar terlebih dahulu.');
       return;
     }
 
-    const room = rooms.find((r) => r.id === roomId);
-    if (!room) {
-      setError('Ruangan tidak ditemukan');
-      return;
-    }
-
-    const participantCount = Number(participants);
-    if (!participantCount || participantCount <= 0) {
-      setError('Jumlah peserta harus lebih dari 0');
-      return;
-    }
-    if (participantCount > room.capacity) {
-      setError(`Jumlah peserta melebihi kapasitas ruangan (${room.capacity} orang)`);
-      return;
-    }
-
-    const conflicting = findConflictingReservations(
-      reservations,
-      roomId,
-      activeDate,
-      startTime,
-      endTime
+    setSubmitting(true);
+    const result = createReservation(
+      {
+        guestName,
+        guestPhone,
+        guestEmail: guestEmail || undefined,
+        guestIdNumber: guestIdNumber || undefined,
+        roomId: selectedRoom.id,
+        checkIn,
+        checkOut,
+        guests,
+        notes: notes || undefined,
+      },
+      user,
+      staffBooking ? { status: 'confirmed' } : { status: 'pending' }
     );
-    if (conflicting.length > 0) {
-      setError('Jadwal bertabrakan dengan reservasi lain. Silakan pilih waktu atau ruangan lain.');
+    setSubmitting(false);
+
+    if (!result.ok || !result.value) {
+      setError(result.error ?? 'Gagal membuat reservasi.');
+      toast({ title: result.error ?? 'Gagal membuat reservasi.', variant: 'error' });
       return;
     }
 
-    const now = new Date().toISOString();
-    const reservation: Reservation = {
-      id: generateReservationId(),
-      userId: user.id,
-      userName: user.name,
-      userEmail: user.email,
-      eventName: eventName.trim(),
-      roomId,
-      roomName: room.name,
-      date: activeDate,
-      startTime,
-      endTime,
-      participants: participantCount,
-      purpose: purpose.trim(),
-      notes: notes.trim(),
-      status: 'Menunggu Persetujuan',
-      rejectionReason: undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    updateReservations([...reservations, reservation]);
-    setSuccess(true);
-    setTimeout(() => router.push('/reservasi-saya'), 1400);
+    setCreated(result.value);
+    toast({
+      title: staffBooking ? 'Reservasi dibuat & dikonfirmasi' : 'Reservasi dikirim',
+      description: staffBooking
+        ? 'Reservasi tercatat dan siap untuk check-in sesuai jadwal.'
+        : 'Menunggu konfirmasi dari resepsionis.',
+      variant: 'success',
+    });
   };
 
-  if (success) {
+  if (created) {
     return (
-      <div className="mx-auto max-w-lg">
-        <Card className="p-8 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-green-50">
-            <CheckCircle2 className="h-8 w-8 text-green-600" />
-          </div>
-          <h2 className="mt-5 text-xl font-semibold text-ink">Reservasi Berhasil Diajukan</h2>
-          <p className="mt-2 text-sm leading-relaxed text-muted">
-            Pengajuan Anda sedang menunggu persetujuan administrator. Anda akan diarahkan ke halaman
-            reservasi.
-          </p>
-          <Link href="/reservasi-saya" className={buttonClasses({ className: 'mt-6' })}>
-            Lihat Reservasi Saya
-          </Link>
-        </Card>
-      </div>
-    );
-  }
+      <div className="mx-auto max-w-xl rounded-2xl border border-line bg-surface p-8 text-center shadow-sm">
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-success-soft text-success">
+          <CheckCircle2 className="h-7 w-7" />
+        </span>
+        <h2 className="mt-5 font-display text-2xl font-semibold text-ink">
+          Reservasi {created.status === 'confirmed' ? 'Terkonfirmasi' : 'Diajukan'}
+        </h2>
+        <p className="mt-2 text-sm text-muted">
+          {created.status === 'confirmed'
+            ? 'Reservasi tercatat dan siap untuk check-in sesuai jadwal.'
+            : 'Reservasi Anda menunggu konfirmasi dari resepsionis.'}
+        </p>
 
-  if (availableRooms.length === 0 && !selectedRoom) {
-    return (
-      <EmptyState
-        icon={CalendarOff}
-        title="Tidak ada ruangan tersedia"
-        description="Semua ruangan sedang dalam pemeliharaan. Silakan coba lagi nanti."
-      />
+        <dl className="mt-6 space-y-3 rounded-xl border border-line bg-canvas p-5 text-left text-sm">
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Kode Reservasi</dt>
+            <dd className="font-semibold text-gold-dark">{created.code}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Kamar</dt>
+            <dd className="font-medium text-ink">
+              {created.roomType} · No. {created.roomNumber}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Menginap</dt>
+            <dd className="font-medium text-ink">
+              {formatDate(created.checkIn)} → {formatDate(created.checkOut)}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Total</dt>
+            <dd className="font-semibold text-ink">{formatCurrency(created.totalAmount)}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/reservasi-saya"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+          >
+            Lihat Reservasi Saya <ArrowRight className="h-4 w-4" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              setCreated(null);
+              setNotes('');
+              setGuestIdNumber('');
+            }}
+            className="inline-flex flex-1 items-center justify-center rounded-lg border border-line bg-white px-4 py-3 text-sm font-medium text-ink transition-colors hover:bg-cream"
+          >
+            Buat Reservasi Lain
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        {error && (
-          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            {error}
-          </div>
-        )}
+    <form onSubmit={handleSubmit} className="grid gap-8 lg:grid-cols-5">
+      <div className="space-y-6 lg:col-span-3">
+        <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
+            <CalendarCheck2 className="h-5 w-5 text-gold-dark" /> Detail Menginap
+          </h2>
 
-        <Card>
-          <CardHeader
-            title="Detail Kegiatan"
-            description="Informasi dasar kegiatan yang akan dipesan"
-            icon={<CalendarClock className="h-4 w-4" />}
-          />
-          <div className="space-y-4 p-5">
-            <Field label="Ruangan" htmlFor="room" required>
-              <Select id="room" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
-                {availableRooms.map((room) => (
-                  <option key={room.id} value={room.id}>
-                    {room.name} — {room.location} (kapasitas {room.capacity})
-                  </option>
-                ))}
-              </Select>
-            </Field>
-
-            <Field label="Nama Kegiatan" htmlFor="event" required>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Field label="Check-in" htmlFor="b-checkIn" required>
               <Input
-                id="event"
-                value={eventName}
-                onChange={(e) => setEventName(e.target.value)}
-                placeholder="Contoh: Rapat Koordinasi Tim"
-              />
-            </Field>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Keperluan" htmlFor="purpose">
-                <Input
-                  id="purpose"
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  placeholder="Contoh: Koordinasi proyek"
-                />
-              </Field>
-              <Field
-                label="Jumlah Peserta"
-                htmlFor="participants"
-                required
-                hint={selectedRoom ? `Maksimal ${selectedRoom.capacity} orang` : undefined}
-              >
-                <Input
-                  id="participants"
-                  type="number"
-                  min={1}
-                  max={selectedRoom?.capacity}
-                  value={participants}
-                  onChange={(e) => setParticipants(e.target.value)}
-                  placeholder="0"
-                />
-              </Field>
-            </div>
-
-            <Field label="Catatan" htmlFor="notes" hint="Opsional">
-              <Textarea
-                id="notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                placeholder="Kebutuhan tambahan, dll."
-              />
-            </Field>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader
-            title="Waktu"
-            description="Tanggal dan rentang jam penggunaan ruangan"
-            icon={<Clock className="h-4 w-4" />}
-          />
-          <div className="grid gap-4 p-5 sm:grid-cols-3">
-            <Field label="Tanggal" htmlFor="date" required>
-              <Input
-                id="date"
+                id="b-checkIn"
                 type="date"
                 min={today}
-                value={activeDate}
-                onChange={(e) => setDate(e.target.value)}
+                value={checkIn}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setCheckIn(value);
+                  if (value && (!checkOut || checkOut <= value)) setCheckOut(addDays(value, 1));
+                }}
+                required
               />
             </Field>
-            <Field label="Jam Mulai" htmlFor="start" required>
-              <Select id="start" value={startTime} onChange={(e) => setStartTime(e.target.value)}>
-                {TIME_OPTIONS.slice(0, -1).map((time) => (
-                  <option key={time} value={time}>
-                    {time}
+            <Field label="Check-out" htmlFor="b-checkOut" required>
+              <Input
+                id="b-checkOut"
+                type="date"
+                min={checkIn ? addDays(checkIn, 1) : today}
+                value={checkOut}
+                onChange={(event) => setCheckOut(event.target.value)}
+                required
+              />
+            </Field>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field label="Kamar" htmlFor="b-room" required>
+              <Select
+                id="b-room"
+                value={roomId}
+                onChange={(event) => setRoomId(event.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  Pilih kamar…
+                </option>
+                {availableRooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.type} · No. {room.number} · {formatCurrency(room.pricePerNight)}
                   </option>
                 ))}
               </Select>
             </Field>
-            <Field label="Jam Selesai" htmlFor="end" required>
-              <Select id="end" value={endTime} onChange={(e) => setEndTime(e.target.value)}>
-                {TIME_OPTIONS.slice(1).map((time) => (
-                  <option key={time} value={time}>
-                    {time}
+            <Field label="Jumlah Tamu" htmlFor="b-guests" required>
+              <Select
+                id="b-guests"
+                value={guests}
+                onChange={(event) => setGuests(Number(event.target.value))}
+              >
+                {[1, 2, 3, 4].map((n) => (
+                  <option key={n} value={n}>
+                    {n} orang
                   </option>
                 ))}
               </Select>
             </Field>
           </div>
-        </Card>
 
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Link href="/ruangan" className={buttonClasses({ variant: 'secondary' })}>
-            Batal
-          </Link>
-          <Button type="submit">Ajukan Reservasi</Button>
-        </div>
+          {selectedRoom && guests > selectedRoom.capacity && (
+            <p className="mt-3 rounded-lg bg-warning-soft px-3.5 py-2.5 text-sm text-warning">
+              Kapasitas kamar ini maksimal {selectedRoom.capacity} orang.
+            </p>
+          )}
+
+          {!loading && availableRooms.length === 0 && (
+            <p className="mt-3 rounded-lg bg-danger-soft px-3.5 py-2.5 text-sm text-danger">
+              Tidak ada kamar tersedia untuk rentang tanggal tersebut. Coba ubah tanggal.
+            </p>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-line bg-surface p-6 shadow-sm">
+          <h2 className="font-display text-lg font-semibold text-ink">Data Tamu</h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Field label="Nama Lengkap" htmlFor="b-name" required>
+              <Input
+                id="b-name"
+                value={guestName}
+                onChange={(event) => setGuestName(event.target.value)}
+                placeholder="Sesuai identitas"
+                required
+              />
+            </Field>
+            <Field label="Nomor Telepon" htmlFor="b-phone" required>
+              <Input
+                id="b-phone"
+                value={guestPhone}
+                onChange={(event) => setGuestPhone(event.target.value)}
+                placeholder="0812-xxxx-xxxx"
+                required
+              />
+            </Field>
+            <Field label="Email" htmlFor="b-email" hint="Opsional, untuk konfirmasi">
+              <Input
+                id="b-email"
+                type="email"
+                value={guestEmail}
+                onChange={(event) => setGuestEmail(event.target.value)}
+                placeholder="nama@email.com"
+              />
+            </Field>
+            <Field label="No. Identitas (KTP/Paspor)" htmlFor="b-id" hint="Opsional">
+              <Input
+                id="b-id"
+                value={guestIdNumber}
+                onChange={(event) => setGuestIdNumber(event.target.value)}
+                placeholder="3175-xxxx-xxxx"
+              />
+            </Field>
+          </div>
+
+          <Field label="Catatan Khusus" htmlFor="b-notes" className="mt-4">
+            <Textarea
+              id="b-notes"
+              rows={3}
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Permintaan khusus, mis. kamar lantai tinggi, late check-out…"
+            />
+          </Field>
+        </section>
       </div>
 
-      <aside className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-        {selectedRoom && (
-          <Card className="overflow-hidden p-0">
-            <div className="relative aspect-[16/9] w-full bg-slate-100">
-              <Image
-                src={selectedRoom.image}
-                alt={selectedRoom.name}
-                fill
-                sizes="(max-width: 1024px) 100vw, 33vw"
-                className="object-cover"
-              />
-            </div>
-            <div className="p-5">
-              <h3 className="font-semibold text-ink">{selectedRoom.name}</h3>
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
-                <MapPin className="h-4 w-4 shrink-0" />
-                {selectedRoom.location}
-              </p>
-              <p className="mt-1.5 flex items-center gap-1.5 text-sm text-muted">
-                <Users className="h-4 w-4 shrink-0" />
-                Kapasitas {selectedRoom.capacity} orang
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {selectedRoom.facilities.map((facility) => {
-                  const Icon = getFacilityIcon(facility);
-                  return (
-                    <span
-                      key={facility}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-canvas px-2.5 py-1 text-xs font-medium text-muted"
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {facility}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </Card>
-        )}
+      <aside className="lg:col-span-2">
+        <div className="sticky top-24 rounded-2xl border border-line bg-surface p-6 shadow-sm">
+          <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-ink">
+            <Receipt className="h-5 w-5 text-gold-dark" /> Ringkasan
+          </h2>
 
-        <Card>
-          <CardHeader title="Ketersediaan" icon={<Clock className="h-4 w-4" />} />
-          <div className="p-5">
-            {activeDate && !isPastDate(activeDate, today) ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted">{formatDate(activeDate)}</p>
-                {conflicts.length === 0 ? (
-                  <p className="flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-700">
-                    <Info className="h-4 w-4" /> Waktu ini masih tersedia
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {conflicts.map((r) => (
-                      <div
-                        key={r.id}
-                        className="rounded-lg border border-orange-200 bg-orange-50 p-2.5 text-xs text-orange-800"
-                      >
-                        <span className="font-semibold">
-                          {r.startTime}–{r.endTime}
-                        </span>{' '}
-                        • {r.eventName}
-                        <span className="ml-1 text-orange-600">({r.status})</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted">Pilih tanggal yang akan datang.</p>
-            )}
+          <dl className="mt-5 space-y-3 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">Kamar</dt>
+              <dd className="text-right font-medium text-ink">
+                {selectedRoom ? `${selectedRoom.type} · No. ${selectedRoom.number}` : '—'}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">Durasi</dt>
+              <dd className="font-medium text-ink">{nights > 0 ? `${nights} malam` : '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">Tarif / malam</dt>
+              <dd className="font-medium text-ink">
+                {selectedRoom ? formatCurrency(selectedRoom.pricePerNight) : '—'}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-5 flex items-end justify-between border-t border-line pt-5">
+            <span className="text-sm text-muted">Estimasi Total</span>
+            <span className="font-display text-2xl font-semibold text-ink">
+              {formatCurrency(estimatedTotal)}
+            </span>
           </div>
-        </Card>
+
+          {error && (
+            <div className="animate-fade-in mt-5 rounded-lg border border-danger/20 bg-danger-soft px-3.5 py-2.5 text-sm font-medium text-danger">
+              {error}
+            </div>
+          )}
+
+          <Button
+            type="submit"
+            size="lg"
+            variant="gold"
+            className="mt-5 w-full"
+            loading={submitting}
+            disabled={!selectedRoom || !datesValid}
+          >
+            {staffBooking ? 'Buat & Konfirmasi' : 'Ajukan Reservasi'}
+          </Button>
+
+          {!staffBooking && (
+            <p className="mt-3 text-center text-xs text-muted">
+              Reservasi akan dikonfirmasi oleh resepsionis.
+            </p>
+          )}
+        </div>
       </aside>
     </form>
   );

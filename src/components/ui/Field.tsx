@@ -9,8 +9,8 @@ import { cn } from '@/lib/cn';
 
 const baseControl =
   'w-full rounded-lg border border-line bg-white text-sm text-ink shadow-sm transition-colors duration-150 ' +
-  'placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/10 ' +
-  'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-muted';
+  'placeholder:text-stone-400 focus:border-gold focus:outline-none focus:ring-4 focus:ring-gold/15 ' +
+  'disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-muted';
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={cn(baseControl, 'h-11 px-3.5', className)} {...props} />;

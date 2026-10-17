@@ -3,46 +3,67 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
-import { CalendarCheck2 } from 'lucide-react';
+import { isAdmin, isStaff } from '@/lib/domain';
+import { APP_NAME } from '@/constants/data';
+import { Hotel } from 'lucide-react';
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  /** Hanya staf (admin/resepsionis) yang boleh masuk. */
+  requireStaff?: boolean;
+  /** Hanya admin yang boleh masuk. */
+  requireAdmin?: boolean;
+  /** Daftar role yang diizinkan; meng-override flag requireStaff/requireAdmin. */
+  allowRoles?: Array<'admin' | 'receptionist' | 'guest'>;
+}
 
 export function ProtectedRoute({
   children,
+  requireStaff = false,
   requireAdmin = false,
-}: {
-  children: React.ReactNode;
-  requireAdmin?: boolean;
-}) {
-  const { user, loading } = useAuth();
+  allowRoles,
+}: ProtectedRouteProps) {
+  const { user, role, loading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-        return;
-      }
-      if (requireAdmin && user.role !== 'admin') {
-        router.push('/dashboard');
-        return;
-      }
-    }
-  }, [user, loading, requireAdmin, router]);
+  const allowed =
+    allowRoles ??
+    (requireAdmin
+      ? (['admin'] as const)
+      : requireStaff
+        ? (['admin', 'receptionist'] as const)
+        : null);
 
-  if (loading) {
+  const roleOk = !allowed || (role !== undefined && allowed.includes(role));
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+    if (!roleOk) {
+      if (isStaff(role) || isAdmin(role)) router.replace('/staf');
+      else router.replace('/');
+    }
+  }, [user, role, roleOk, loading, router]);
+
+  if (loading || !user) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-canvas">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-navy text-white shadow-lg shadow-navy/20">
-          <CalendarCheck2 className="h-6 w-6" />
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-charcoal text-gold shadow-lg shadow-charcoal/20">
+          <Hotel className="h-6 w-6" />
         </span>
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-primary" />
-        <p className="text-sm text-muted">Memuat...</p>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-gold" />
+        <p className="text-sm text-muted">Menyiapkan sesi Anda…</p>
+        <p className="text-xs text-muted/70">{APP_NAME}</p>
       </div>
     );
   }
 
-  if (!user || (requireAdmin && user.role !== 'admin')) {
-    return null;
-  }
+  if (!roleOk) return null;
 
   return <>{children}</>;
 }
+
+export default ProtectedRoute;

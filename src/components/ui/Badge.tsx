@@ -1,14 +1,16 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
-export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
+export type BadgeTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger' | 'gold' | 'info';
 
 const TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-slate-100 text-slate-600 border-slate-200',
-  primary: 'bg-primary-soft text-primary border-blue-200',
-  success: 'bg-green-50 text-green-700 border-green-200',
-  warning: 'bg-orange-50 text-orange-700 border-orange-200',
-  danger: 'bg-red-50 text-red-700 border-red-200',
+  neutral: 'bg-stone-100 text-stone-600 border-stone-200',
+  primary: 'bg-primary-soft text-primary border-line',
+  success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  warning: 'bg-amber-50 text-amber-700 border-amber-200',
+  danger: 'bg-rose-50 text-rose-700 border-rose-200',
+  gold: 'bg-gold-soft text-gold-dark border-gold/30',
+  info: 'bg-sky-50 text-sky-700 border-sky-200',
 };
 
 export default function Badge({

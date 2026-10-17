@@ -1,76 +1,94 @@
 import type { ReactNode } from 'react';
-import type { Reservation } from '@/types';
-import StatusBadge from '@/components/ui/StatusBadge';
+import { BedDouble, CalendarRange, Phone, Users, Hash } from 'lucide-react';
+import { formatCurrency } from '@/lib/repository';
 import { formatDate } from '@/utils/helpers';
-import { Card } from '@/components/ui/Card';
-import { Calendar, Clock, MapPin, Users, User, Info } from 'lucide-react';
+import StatusBadge from '@/components/ui/StatusBadge';
+import PaymentBadge from '@/components/ui/PaymentBadge';
+import type { Reservation } from '@/types';
 
 export default function ReservationCard({
   reservation,
   actions,
-  showUser = false,
+  footer,
 }: {
   reservation: Reservation;
   actions?: ReactNode;
-  showUser?: boolean;
+  footer?: ReactNode;
 }) {
   return (
-    <Card className="flex flex-col p-5 transition-shadow hover:shadow-md hover:shadow-slate-200">
+    <article className="rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-stone-300/30">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="font-semibold text-ink">{reservation.eventName}</h3>
-          <p className="mt-0.5 font-mono text-xs text-muted">{reservation.id}</p>
+          <div className="flex items-center gap-2 text-xs text-muted">
+            <Hash className="h-3.5 w-3.5" />
+            <span className="font-mono font-medium text-gold-dark">{reservation.code}</span>
+          </div>
+          <h3 className="mt-1.5 font-display text-lg font-semibold text-ink">
+            {reservation.guestName}
+          </h3>
+          {reservation.guestPhone && (
+            <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted">
+              <Phone className="h-3.5 w-3.5" /> {reservation.guestPhone}
+            </p>
+          )}
         </div>
-        <StatusBadge status={reservation.status} />
+        <div className="flex flex-col items-end gap-1.5">
+          <StatusBadge status={reservation.status} />
+          <PaymentBadge status={reservation.paymentStatus} />
+        </div>
       </div>
 
-      <div className="mt-4 grid gap-2.5 text-sm text-muted sm:grid-cols-2">
-        <p className="flex items-center gap-2">
-          <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-          {reservation.roomName}
-        </p>
-        <p className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
-          {formatDate(reservation.date)}
-        </p>
-        <p className="flex items-center gap-2">
-          <Clock className="h-4 w-4 shrink-0 text-slate-400" />
-          {reservation.startTime} – {reservation.endTime}
-        </p>
-        <p className="flex items-center gap-2">
-          <Users className="h-4 w-4 shrink-0 text-slate-400" />
-          {reservation.participants} peserta
-        </p>
-        {showUser && (
-          <p className="flex items-center gap-2 sm:col-span-2">
-            <User className="h-4 w-4 shrink-0 text-slate-400" />
-            {reservation.userName} — {reservation.userEmail}
-          </p>
-        )}
+      <div className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="flex items-start gap-2">
+          <BedDouble className="mt-0.5 h-4 w-4 shrink-0 text-gold-dark" />
+          <div>
+            <p className="text-xs text-muted">Kamar</p>
+            <p className="text-sm font-medium text-ink">
+              {reservation.roomType} · No. {reservation.roomNumber}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <CalendarRange className="mt-0.5 h-4 w-4 shrink-0 text-gold-dark" />
+          <div>
+            <p className="text-xs text-muted">Menginap</p>
+            <p className="text-sm font-medium text-ink">
+              {formatDate(reservation.checkIn)} → {formatDate(reservation.checkOut)}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <Users className="mt-0.5 h-4 w-4 shrink-0 text-gold-dark" />
+          <div>
+            <p className="text-xs text-muted">Tamu</p>
+            <p className="text-sm font-medium text-ink">
+              {reservation.guests} orang · {reservation.nights} malam
+            </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs text-muted">Total</p>
+          <p className="text-sm font-semibold text-ink">{formatCurrency(reservation.totalAmount)}</p>
+          {reservation.amountPaid > 0 && reservation.paymentStatus !== 'paid' && (
+            <p className="text-xs text-muted">
+              Dibayar {formatCurrency(reservation.amountPaid)}
+            </p>
+          )}
+        </div>
       </div>
-
-      {reservation.purpose && (
-        <p className="mt-3 text-sm text-muted">
-          <span className="font-medium text-ink">Keperluan:</span> {reservation.purpose}
-        </p>
-      )}
 
       {reservation.notes && (
-        <p className="mt-1 text-sm text-muted">
-          <span className="font-medium text-ink">Catatan:</span> {reservation.notes}
+        <p className="mt-3 rounded-lg bg-canvas px-3.5 py-2 text-xs text-muted">
+          Catatan: {reservation.notes}
         </p>
       )}
 
-      {reservation.status === 'Ditolak' && reservation.rejectionReason && (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>Alasan penolakan: {reservation.rejectionReason}</span>
+      {(actions || footer) && (
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+          {footer}
+          {actions}
         </div>
       )}
-
-      {actions && (
-        <div className="mt-auto flex flex-wrap gap-2 pt-4">{actions}</div>
-      )}
-    </Card>
+    </article>
   );
 }

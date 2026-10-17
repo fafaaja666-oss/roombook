@@ -40,9 +40,9 @@ export function useToast(): ToastContextValue {
 }
 
 const VARIANT_STYLES: Record<ToastVariant, { icon: typeof Info; wrap: string; iconColor: string }> = {
-  success: { icon: CheckCircle2, wrap: 'border-green-200', iconColor: 'text-green-600' },
-  error: { icon: XCircle, wrap: 'border-red-200', iconColor: 'text-red-600' },
-  info: { icon: Info, wrap: 'border-blue-200', iconColor: 'text-primary' },
+  success: { icon: CheckCircle2, wrap: 'border-success/25', iconColor: 'text-success' },
+  error: { icon: XCircle, wrap: 'border-danger/25', iconColor: 'text-danger' },
+  info: { icon: Info, wrap: 'border-line', iconColor: 'text-gold-dark' },
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
