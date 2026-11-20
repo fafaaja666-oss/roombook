@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { MUSIC_YOUTUBE_ID } from '@/constants/data';
 import { getServerSnapshot, getSnapshot, setMuted, subscribe } from '@/lib/music-store';
@@ -8,9 +8,8 @@ import { PLAYER_STATE, loadYouTubeApi, type YTPlayer } from '@/lib/youtube';
 import { cn } from '@/lib/cn';
 
 const WATCHDOG_MS = 1800;
-
-/** Volume latar yang lembut & tetap (tidak ada kontrol volume di UI). */
 const FIXED_VOLUME = 35;
+const GESTURE_EVENTS = ['pointerdown', 'touchstart', 'keydown'] as const;
 
 /**
  * Musik latar global berbasis YouTube IFrame Player API.
@@ -30,14 +29,42 @@ const FIXED_VOLUME = 35;
  */
 export default function BackgroundMusic() {
   const hostRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const watchdogRef = useRef<number | null>(null);
+  const stateRef = useRef<number | null>(null);
+  const autoplayAttemptedRef = useRef(false);
 
   const prefs = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [ready, setReady] = useState(false);
   const [playerState, setPlayerState] = useState<number | null>(null);
   const [blocked, setBlocked] = useState(false);
   const [failed, setFailed] = useState(false);
+
+  const playing = playerState === PLAYER_STATE.PLAYING;
+  const buffering = playerState === PLAYER_STATE.BUFFERING;
+
+  const startPlayback = useCallback(() => {
+    const player = playerRef.current;
+    if (!player || failed) return;
+    if (
+      stateRef.current === PLAYER_STATE.PLAYING ||
+      stateRef.current === PLAYER_STATE.BUFFERING
+    ) {
+      return;
+    }
+
+    const current = getSnapshot();
+    player.setVolume(FIXED_VOLUME);
+    if (current.muted) player.mute();
+    else player.unMute();
+
+    try {
+      player.playVideo();
+    } catch {
+      setBlocked(true);
+    }
+  }, [failed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,12 +91,15 @@ export default function BackgroundMusic() {
             rel: 0,
             playsinline: 1,
             iv_load_policy: 3,
+            loop: 1,
+            playlist: MUSIC_YOUTUBE_ID,
             origin: window.location.origin,
           },
           events: {
             onReady: (event) => {
               if (cancelled) return;
               const current = getSnapshot();
+              stateRef.current = event.target.getPlayerState();
               event.target.setVolume(FIXED_VOLUME);
               if (current.muted) event.target.mute();
               else event.target.unMute();
@@ -77,19 +107,23 @@ export default function BackgroundMusic() {
             },
             onStateChange: (event) => {
               if (cancelled) return;
+              stateRef.current = event.data;
               setPlayerState(event.data);
-              if (event.data === PLAYER_STATE.PLAYING) setBlocked(false);
-              if (event.data === PLAYER_STATE.ENDED) {
-                try {
-                  event.target.playVideo();
-                } catch {
-                  /* abaikan */
+              if (event.data === PLAYER_STATE.PLAYING) {
+                setBlocked(false);
+                if (watchdogRef.current) {
+                  window.clearTimeout(watchdogRef.current);
+                  watchdogRef.current = null;
                 }
               }
             },
             onError: () => {
               if (cancelled) return;
               setFailed(true);
+              if (watchdogRef.current) {
+                window.clearTimeout(watchdogRef.current);
+                watchdogRef.current = null;
+              }
             },
           },
         });
@@ -116,35 +150,43 @@ export default function BackgroundMusic() {
   }, []);
 
   useEffect(() => {
-    const player = playerRef.current;
-    if (!player || !ready) return;
-
-    const current = getSnapshot();
-    player.setVolume(FIXED_VOLUME);
-    if (current.muted) player.mute();
-    else player.unMute();
-
-    try {
-      player.playVideo();
-    } catch {
-      /* kegagalan pemutaran ditangani oleh watchdog di bawah */
-    }
+    if (!ready || autoplayAttemptedRef.current) return;
+    autoplayAttemptedRef.current = true;
+    setBlocked(false);
+    startPlayback();
 
     if (watchdogRef.current) window.clearTimeout(watchdogRef.current);
     watchdogRef.current = window.setTimeout(() => {
-      const state = player.getPlayerState();
+      const state = playerRef.current?.getPlayerState();
       if (state !== PLAYER_STATE.PLAYING && state !== PLAYER_STATE.BUFFERING) {
         setBlocked(true);
       }
     }, WATCHDOG_MS);
+  }, [ready, startPlayback]);
 
-    return () => {
-      if (watchdogRef.current) {
-        window.clearTimeout(watchdogRef.current);
-        watchdogRef.current = null;
+  useEffect(() => {
+    if (!ready || failed || playing || buffering) return;
+
+    function removeGestureListeners() {
+      for (const eventName of GESTURE_EVENTS) {
+        document.removeEventListener(eventName, onGesture, true);
       }
-    };
-  }, [ready]);
+    }
+
+    function onGesture(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && buttonRef.current?.contains(target)) return;
+      removeGestureListeners();
+      setBlocked(false);
+      startPlayback();
+    }
+
+    for (const eventName of GESTURE_EVENTS) {
+      document.addEventListener(eventName, onGesture, true);
+    }
+
+    return removeGestureListeners;
+  }, [ready, failed, playing, buffering, startPlayback]);
 
   useEffect(() => {
     const player = playerRef.current;
@@ -152,9 +194,6 @@ export default function BackgroundMusic() {
     if (prefs.muted) player.mute();
     else player.unMute();
   }, [prefs.muted, ready]);
-
-  const playing = playerState === PLAYER_STATE.PLAYING;
-  const buffering = playerState === PLAYER_STATE.BUFFERING;
 
   let statusLabel: string;
   let statusDot: string;
@@ -171,7 +210,6 @@ export default function BackgroundMusic() {
     statusLabel = 'Memuat musik…';
     statusDot = 'bg-warning animate-pulse';
   } else if (prefs.muted) {
-    // Preferensi bisu selalu tercermin, apa pun state pemutaran.
     statusLabel = 'Musik dibisukan — ketuk untuk menyalakan suara';
     statusDot = 'bg-line';
   } else if (blocked) {
@@ -186,19 +224,15 @@ export default function BackgroundMusic() {
     const player = playerRef.current;
     if (!player || !ready || failed) return;
 
-    if (!playing) {
-      setBlocked(false);
-      if (prefs.muted) setMuted(false);
-      try {
-        player.unMute();
-        player.playVideo();
-      } catch {
-        setBlocked(true);
-      }
-      return;
-    }
+    const nextMuted = !prefs.muted;
+    setMuted(nextMuted);
+    if (nextMuted) player.mute();
+    else player.unMute();
 
-    setMuted(!prefs.muted);
+    if (stateRef.current !== PLAYER_STATE.PLAYING && stateRef.current !== PLAYER_STATE.BUFFERING) {
+      setBlocked(false);
+      startPlayback();
+    }
   }
 
   return (
@@ -213,6 +247,7 @@ export default function BackgroundMusic() {
       </div>
 
       <button
+        ref={buttonRef}
         type="button"
         onClick={handleToggle}
         disabled={!ready || failed}

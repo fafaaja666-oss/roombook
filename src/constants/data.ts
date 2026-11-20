@@ -22,9 +22,9 @@ export const ROOM_TYPES = ['Standard', 'Deluxe', 'Suite', 'Executive'] as const;
  * Ganti ID di bawah untuk memakai video lain. Pemutar dimuat lewat YouTube
  * IFrame Player API dan menyesuaikan kebijakan autoplay peramban.
  *
- * Video aktif: https://youtu.be/nB2nXKENAco
+ * Video aktif: https://youtu.be/YN5Jd3wVUeI
  */
-export const MUSIC_YOUTUBE_ID = 'nB2nXKENAco';
+export const MUSIC_YOUTUBE_ID = 'YN5Jd3wVUeI';
 export const MUSIC_TRACK_TITLE = 'Musik Lobby RoomBook';
 
 /** Akun demo. Kata sandi hanya untuk keperluan prototipe. */
